@@ -1,0 +1,1 @@
+go build -o haleakala.exe cmd/haleakala.go
