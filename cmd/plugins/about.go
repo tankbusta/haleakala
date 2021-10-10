@@ -10,7 +10,7 @@ import (
 
 var (
 	startTime time.Time
-	msg       = `Project Haleakala written by Thomas Le'Breau
+	msg       = `Project Haleakala
 	**Uptime**: %s`
 )
 
