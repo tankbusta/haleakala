@@ -3,15 +3,14 @@ package main
 import (
 	"flag"
 	"fmt"
-	"log"
 	"os"
 	"os/signal"
 	"syscall"
 
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"github.com/tankbusta/haleakala"
 	"github.com/tankbusta/haleakala/cmd/plugins"
-
-	"github.com/sirupsen/logrus"
 )
 
 var (
@@ -27,13 +26,16 @@ func init() {
 	flag.BoolVar(&showPlugins, "show-plugins", false, "list plugins and exit")
 	flag.BoolVar(&failOnRouteError, "route-failure-fatal", false, "route/plugin issues are considered a fatal error")
 	flag.Parse()
+
+	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
+	if showDebug {
+		zerolog.SetGlobalLevel(zerolog.DebugLevel)
+	}
 }
 
 func main() {
-	log.SetOutput(logrus.StandardLogger().Out)
-
 	if configPath == "" {
-		logrus.Fatal("-config/BOT_CONFIG must be set")
+		log.Fatal().Msg("-config/BOT_CONFIG must be set")
 	}
 
 	if showPlugins {
@@ -50,11 +52,7 @@ func main() {
 
 	ctx, err := haleakala.New(configPath)
 	if err != nil {
-		logrus.WithError(err).Fatal("Failed to start bot")
-	}
-
-	if showDebug {
-		logrus.SetLevel(logrus.DebugLevel)
+		log.Fatal().Err(err).Msg("failed to create bot")
 	}
 
 	sig := make(chan os.Signal, 1)
@@ -62,7 +60,7 @@ func main() {
 	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
 
 	if err := ctx.Start(); err != nil {
-		logrus.WithError(err).Fatal("Failed to start bot")
+		log.Error().Err(err).Msg("failed to start bot")
 		os.Exit(-1)
 	}
 
@@ -70,16 +68,20 @@ func main() {
 	for _, plugin := range plugins.DefaultPlugins {
 		if err := plugin.InstallRoute(ctx.InstallRoute); err != nil {
 			if failOnRouteError {
-				logrus.WithError(err).Fatalf("An error occured while loading plugin %s", plugin.Name())
+				log.Fatal().
+					Err(err).
+					Msgf("An error occured while loading plugin %s", plugin.Name())
 			}
 
-			logrus.WithError(err).Errorf("An error occured while loading plugin %s", plugin.Name())
+			log.Error().
+				Err(err).
+				Msgf("An error occured while loading plugin %s", plugin.Name())
 		}
 	}
 
 	go func() {
 		for _ = range sig {
-			logrus.Warn("Stopping haleakala")
+			log.Warn().Msg("Received SIGINT, shutting down")
 			ctx.Stop()
 			finished <- true
 		}

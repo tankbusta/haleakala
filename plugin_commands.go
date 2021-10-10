@@ -5,8 +5,6 @@ import (
 	"fmt"
 
 	"github.com/tankbusta/haleakala/muxer"
-
-	"github.com/sirupsen/logrus"
 )
 
 func (s *Context) ListLoadedPlugins(ctx *muxer.Context) {
@@ -93,9 +91,9 @@ func (s *Context) LoadPlugin(ctx *muxer.Context) {
 			cfg = plcfg.Config
 
 			if !plcfg.Enabled {
-				logrus.WithFields(logrus.Fields{
-					"plugin": pluginToLoad,
-				}).Warn("Cannot load a disabled plugin")
+				// logrus.WithFields(logrus.Fields{
+				// 	"plugin": pluginToLoad,
+				// }).Warn("Cannot load a disabled plugin")
 				ctx.Send(fmt.Sprintf(":octagonal_sign: %s is turned off by the server admin", pluginToLoad))
 				return
 			}
@@ -104,16 +102,16 @@ func (s *Context) LoadPlugin(ctx *muxer.Context) {
 
 	plugin, err := pluginInit.Initialize(PluginConfigVars(cfg), s.ds, s.createBucketForPlugin(pluginToLoad))
 	if err != nil {
-		logrus.WithError(err).Error("An error occured while initializing the plugin", pluginToLoad)
+		// logrus.WithError(err).Error("An error occured while initializing the plugin", pluginToLoad)
 		ctx.Send(fmt.Sprintf(":octagonal_sign: %s", err))
 		return
 	}
 
 	if err := plugin.InstallRoute(s.InstallRoute); err != nil {
-		logrus.WithFields(logrus.Fields{
-			"plugin": plugin.Name(),
-			"error":  err,
-		}).Warn("Plugin could not be initialized properly")
+		// logrus.WithFields(logrus.Fields{
+		// 	"plugin": plugin.Name(),
+		// 	"error":  err,
+		// }).Warn("Plugin could not be initialized properly")
 		ctx.Send(fmt.Sprintf(":octagonal_sign: %s", err))
 		return
 	}

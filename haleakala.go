@@ -5,11 +5,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/tankbusta/haleakala/muxer"
 	"github.com/asdine/storm"
+	"github.com/rs/zerolog/log"
+	"github.com/tankbusta/haleakala/muxer"
 
 	"github.com/bwmarrin/discordgo"
-	"github.com/sirupsen/logrus"
 )
 
 var (
@@ -81,34 +81,35 @@ func (s *Context) InitializePlugin(f IPlugin) error {
 func (s *Context) loadPluginsFromConfig() error {
 	for _, plug := range s.cfg.Plugins {
 		if !plug.Enabled {
-			logrus.WithFields(logrus.Fields{
-				"plugin": plug.PluginName,
-			}).Warn("Skipping plugin load as it's not enabled")
+			log.Warn().
+				Str("plugin", plug.PluginName).
+				Msg("Skipping plugin load as it's not enabled")
 			continue
 		}
 
 		found := GetPlugin(plug.PluginName)
 		if found == nil {
-			logrus.WithFields(logrus.Fields{
-				"plugin": plug.PluginName,
-			}).Warn("Plugin Not Found")
+
+			log.Warn().
+				Str("plugin", plug.PluginName).
+				Msg("Plugin not found")
 			continue
 		}
 
 		plugin, err := found.Initialize(PluginConfigVars(plug.Config), s.ds, s.createBucketForPlugin(plug.PluginName))
 		if err != nil {
-			logrus.WithFields(logrus.Fields{
-				"plugin": plug.PluginName,
-				"error":  err,
-			}).Warn("Plugin could not be initialized properly")
+			log.Error().
+				Err(err).
+				Str("plugin", plug.PluginName).
+				Msg("Plugin could not be initialized properly")
 			return err
 		}
 
 		if err := plugin.InstallRoute(s.InstallRoute); err != nil {
-			logrus.WithFields(logrus.Fields{
-				"plugin": plug.PluginName,
-				"error":  err,
-			}).Warn("Plugin could not be initialized properly")
+			log.Error().
+				Err(err).
+				Str("plugin", plug.PluginName).
+				Msg("Plugin could not be initialized properly")
 			return err
 		}
 
@@ -116,9 +117,9 @@ func (s *Context) loadPluginsFromConfig() error {
 		s.plugins[plugin.Name()] = plugin
 		s.rwmu.Unlock()
 
-		logrus.WithFields(logrus.Fields{
-			"plugin": plug.PluginName,
-		}).Warn("Plugin has been loaded successfully")
+		log.Warn().
+			Str("plugin", plug.PluginName).
+			Msg("Plugin loaded successfully!")
 	}
 	return nil
 }
@@ -135,8 +136,7 @@ func (s *Context) Start() error {
 	}
 
 	// Fetch our user record to ensure we've successfully logged in
-	currentUser, err := s.ds.User("@me")
-	if err != nil {
+	if _, err := s.ds.User("@me"); err != nil {
 		return err
 	}
 
@@ -146,11 +146,6 @@ func (s *Context) Start() error {
 	s.mux.Route("plugins", "", AllowOnCertainChannels(s.cfg.Discord.AdminChannels), s.ListLoadedPlugins)
 	s.mux.Route("unload", "", AllowOnCertainChannels(s.cfg.Discord.AdminChannels), s.UnloadPlugin)
 	s.mux.Route("load", "", AllowOnCertainChannels(s.cfg.Discord.AdminChannels), s.LoadPlugin)
-
-	logrus.WithFields(logrus.Fields{
-		"username": currentUser.Username,
-		"user_id":  currentUser.ID,
-	}).Info("Logged in")
 
 	if len(s.cfg.Discord.StatusChanger.Statuses) >= 1 {
 		s.wg.Add(1)
@@ -175,15 +170,18 @@ func (s *Context) changeStatus() {
 Loop:
 	for {
 		select {
-		case _ = <-s.stop:
+		case <-s.stop:
 			break Loop
 		case <-ticker.C:
 		}
 		selectedStatus := statuses[r.Intn(len(statuses))]
 
-		logrus.WithField("status", selectedStatus).Debug("Changing game status")
+		log.Debug().
+			Str("status", selectedStatus).
+			Msg("Changing game status")
+
 		if err := s.ds.UpdateStatus(0, selectedStatus); err != nil {
-			logrus.WithError(err).Error("Failed to change status")
+			log.Error().Err(err).Msgf("Failed to change game status to `%s`", selectedStatus)
 		}
 	}
 }
@@ -194,9 +192,8 @@ func (s *Context) Stop() error {
 	// Wait for all our main goroutines to exit..
 	s.wg.Wait()
 
-	for pname, p := range s.plugins {
+	for _, p := range s.plugins {
 		if advp, ok := p.(IPlugin); ok {
-			logrus.Warnf("Destroying plugin %s", pname)
 			advp.Destroy()
 		}
 	}
