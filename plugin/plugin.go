@@ -1,4 +1,4 @@
-package haleakala
+package plugin
 
 import (
 	"encoding/json"
@@ -10,11 +10,11 @@ import (
 
 var (
 	pluginsMu sync.RWMutex
-	plugins   = make(map[string]IPluginInitalizer)
+	plugins   = make(map[string]IBasicPlugin)
 )
 
 // Register makes a plugin available to the system
-func Register(name string, plugin IPluginInitalizer) {
+func Register(name string, plugin IBasicPlugin) {
 	pluginsMu.Lock()
 	defer pluginsMu.Unlock()
 
@@ -41,7 +41,7 @@ func GetListOfPlugins() []string {
 	return out
 }
 
-func GetPlugin(name string) IPluginInitalizer {
+func GetPlugin(name string) IBasicPlugin {
 	pluginsMu.Lock()
 	defer pluginsMu.Unlock()
 
@@ -53,10 +53,6 @@ func GetPlugin(name string) IPluginInitalizer {
 }
 
 type PluginConfigVars json.RawMessage
-
-type IPluginInitalizer interface {
-	Initialize(PluginConfigVars, *discordgo.Session) (IPlugin, error)
-}
 
 // IPlugin defines an interface that plugins can use to embedd into the bot process
 // that are "long running" or maintain some level of state throughout the lifecycle of the bot
@@ -71,6 +67,8 @@ type IPlugin interface {
 type IBasicPlugin interface {
 	// Name returns the name of the plugin
 	Name() string
-	// InstallRoute TODO
-	InstallRoute(InstallFunc) error
+
+	Commands() []discordgo.ApplicationCommand
+
+	OnInteraction(s *discordgo.Session, i *discordgo.InteractionCreate)
 }

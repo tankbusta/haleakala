@@ -3,7 +3,7 @@ module github.com/tankbusta/haleakala
 go 1.17
 
 require (
-	github.com/bwmarrin/discordgo v0.23.2
+	github.com/bwmarrin/discordgo v0.23.3-0.20211010150959-f0b7e81468f7
 	github.com/rs/zerolog v1.25.0
 	github.com/stretchr/testify v1.7.0
 )

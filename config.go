@@ -13,8 +13,7 @@ type PluginConfig struct {
 
 type config struct {
 	Discord struct {
-		Token         string   `yaml:"token" json:"token"`
-		AdminChannels []string `yaml:"admin_channels" json:"admin_channels"`
+		Token string `yaml:"token" json:"token"`
 	} `yaml:"discord" json:"discord"`
 	Plugins []PluginConfig `yaml:"plugins" json:"plugins"`
 }
