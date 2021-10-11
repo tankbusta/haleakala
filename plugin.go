@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/asdine/storm"
 	"github.com/bwmarrin/discordgo"
 )
 
@@ -56,7 +55,7 @@ func GetPlugin(name string) IPluginInitalizer {
 type PluginConfigVars json.RawMessage
 
 type IPluginInitalizer interface {
-	Initialize(PluginConfigVars, *discordgo.Session, storm.Node) (IPlugin, error)
+	Initialize(PluginConfigVars, *discordgo.Session) (IPlugin, error)
 }
 
 // IPlugin defines an interface that plugins can use to embedd into the bot process

@@ -100,7 +100,7 @@ func (s *Context) LoadPlugin(ctx *muxer.Context) {
 		}
 	}
 
-	plugin, err := pluginInit.Initialize(PluginConfigVars(cfg), s.ds, s.createBucketForPlugin(pluginToLoad))
+	plugin, err := pluginInit.Initialize(PluginConfigVars(cfg), s.ds)
 	if err != nil {
 		// logrus.WithError(err).Error("An error occured while initializing the plugin", pluginToLoad)
 		ctx.Send(fmt.Sprintf(":octagonal_sign: %s", err))

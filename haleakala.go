@@ -1,11 +1,9 @@
 package haleakala
 
 import (
-	"math/rand"
+	"fmt"
 	"sync"
-	"time"
 
-	"github.com/asdine/storm"
 	"github.com/rs/zerolog/log"
 	"github.com/tankbusta/haleakala/muxer"
 
@@ -28,7 +26,6 @@ type Context struct {
 	mux  *muxer.Mux
 	rwmu *sync.RWMutex
 	wg   *sync.WaitGroup
-	stor *storm.DB
 
 	// Plugin Stuff
 	plugins map[string]IBasicPlugin
@@ -45,12 +42,7 @@ func New(configPath string) (*Context, error) {
 	// Set the default AdminMiddleware to admin only channels
 	DefaultAdminMiddleware = AllowOnCertainChannels(cfg.Discord.AdminChannels)
 
-	db, err := initStorage(cfg.DatabaseConfig)
-	if err != nil {
-		return nil, err
-	}
-
-	ds, err := discordgo.New(cfg.Discord.Username, cfg.Discord.Password, cfg.Discord.Token)
+	ds, err := discordgo.New(fmt.Sprintf("Bot %s", cfg.Discord.Token))
 	if err != nil {
 		return nil, err
 	}
@@ -63,7 +55,6 @@ func New(configPath string) (*Context, error) {
 		wg:      &sync.WaitGroup{},
 		rwmu:    &sync.RWMutex{},
 		plugins: make(map[string]IBasicPlugin),
-		stor:    db,
 	}, nil
 }
 
@@ -96,7 +87,7 @@ func (s *Context) loadPluginsFromConfig() error {
 			continue
 		}
 
-		plugin, err := found.Initialize(PluginConfigVars(plug.Config), s.ds, s.createBucketForPlugin(plug.PluginName))
+		plugin, err := found.Initialize(PluginConfigVars(plug.Config), s.ds)
 		if err != nil {
 			log.Error().
 				Err(err).
@@ -147,43 +138,7 @@ func (s *Context) Start() error {
 	s.mux.Route("unload", "", AllowOnCertainChannels(s.cfg.Discord.AdminChannels), s.UnloadPlugin)
 	s.mux.Route("load", "", AllowOnCertainChannels(s.cfg.Discord.AdminChannels), s.LoadPlugin)
 
-	if len(s.cfg.Discord.StatusChanger.Statuses) >= 1 {
-		s.wg.Add(1)
-		go s.changeStatus()
-	}
-
 	return nil
-}
-
-func (s *Context) changeStatus() {
-	defer s.wg.Done()
-	if s.cfg.Discord.StatusChanger.EverySecond == 0 {
-		s.cfg.Discord.StatusChanger.EverySecond = 60
-	}
-
-	ticker := time.NewTicker(time.Duration(s.cfg.Discord.StatusChanger.EverySecond) * time.Second)
-	defer ticker.Stop()
-
-	r := rand.New(rand.NewSource(time.Now().UnixNano()))
-	statuses := s.cfg.Discord.StatusChanger.Statuses
-
-Loop:
-	for {
-		select {
-		case <-s.stop:
-			break Loop
-		case <-ticker.C:
-		}
-		selectedStatus := statuses[r.Intn(len(statuses))]
-
-		log.Debug().
-			Str("status", selectedStatus).
-			Msg("Changing game status")
-
-		if err := s.ds.UpdateStatus(0, selectedStatus); err != nil {
-			log.Error().Err(err).Msgf("Failed to change game status to `%s`", selectedStatus)
-		}
-	}
 }
 
 // Stop will end the bot safely
