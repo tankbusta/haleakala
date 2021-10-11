@@ -65,10 +65,17 @@ func (whiskeyP) Commands() []discordgo.ApplicationCommand {
 }
 
 func (whiskeyP) OnInteraction(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	var m string
+
 	whiskey := whiskies[r.Intn(len(whiskies))]
 	year := commonYears[r.Intn(len(commonYears))]
 
-	m := fmt.Sprintf("%s have a neat %s %d year on the house!", i.Member.Nick, whiskey, year)
+	usr := plugin.GetUnderlyingUserIdentifier(i.Interaction)
+	if usr != "" {
+		m = fmt.Sprintf("%s have a neat %s %d year on the house!", usr, whiskey, year)
+	} else {
+		m = fmt.Sprintf("have a neat %s %d year on the house!", whiskey, year)
+	}
 
 	s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 		Type: discordgo.InteractionResponseChannelMessageWithSource,
