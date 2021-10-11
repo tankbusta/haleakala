@@ -23,7 +23,6 @@ type Context struct {
 	cfg  *config
 	ds   *discordgo.Session
 	stop chan bool
-	rwmu *sync.RWMutex
 	wg   *sync.WaitGroup
 
 	// Plugin Stuff
@@ -46,7 +45,6 @@ func New(configPath string) (*Context, error) {
 		ds:      ds,
 		stop:    make(chan bool, 1),
 		wg:      &sync.WaitGroup{},
-		rwmu:    &sync.RWMutex{},
 		plugins: make(map[string]plugin.IBasicPlugin),
 	}, nil
 }
@@ -88,11 +86,8 @@ func (s *Context) Start() error {
 
 			slashCommands[cmd.Name] = plug
 		}
-	}
 
-	// Fetch our user record to ensure we've successfully logged in
-	if _, err := s.ds.User("@me"); err != nil {
-		return err
+		s.plugins[plugName] = plug
 	}
 
 	return nil
