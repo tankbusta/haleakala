@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/bwmarrin/discordgo"
+	"github.com/uptrace/bun"
 )
 
 var (
@@ -34,7 +35,7 @@ func GetListOfPlugins() []string {
 	defer pluginsMu.Unlock()
 
 	out := make([]string, 0)
-	for name, _ := range plugins {
+	for name := range plugins {
 		out = append(out, name)
 	}
 
@@ -54,21 +55,25 @@ func GetPlugin(name string) IBasicPlugin {
 
 type PluginConfigVars json.RawMessage
 
-// IPlugin defines an interface that plugins can use to embedd into the bot process
-// that are "long running" or maintain some level of state throughout the lifecycle of the bot
-type IPlugin interface {
-	Destroy() error
-	// SupportsUnload returns a boolean if this plugin should be allowed to be !unloaded via a command
-	SupportsUnload() bool
-
-	IBasicPlugin
-}
-
 type IBasicPlugin interface {
 	// Name returns the name of the plugin
 	Name() string
 
 	Commands() []discordgo.ApplicationCommand
 
+	OnLoad(s *discordgo.Session, db *bun.DB) error
+
+	OnShutdown(s *discordgo.Session) error
+
 	OnInteraction(s *discordgo.Session, i *discordgo.InteractionCreate)
 }
+
+type BasePlugin struct{}
+
+func (BasePlugin) Commands() []discordgo.ApplicationCommand { return nil }
+
+func (BasePlugin) OnLoad(ds *discordgo.Session, db *bun.DB) error { return nil }
+
+func (BasePlugin) OnShutdown(s *discordgo.Session) error { return nil }
+
+func (BasePlugin) OnInteraction(s *discordgo.Session, i *discordgo.InteractionCreate) {}

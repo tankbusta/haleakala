@@ -5,8 +5,9 @@ import (
 	"math/rand"
 	"time"
 
-	"github.com/bwmarrin/discordgo"
 	"github.com/tankbusta/haleakala/plugin"
+
+	"github.com/bwmarrin/discordgo"
 )
 
 var r = rand.New(rand.NewSource(time.Now().UnixNano()))
@@ -47,7 +48,9 @@ var commonYears = []int{
 	25,
 }
 
-type whiskeyP struct{}
+type whiskeyP struct {
+	plugin.BasePlugin
+}
 
 func (whiskeyP) Name() string { return "whiskey" }
 

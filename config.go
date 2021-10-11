@@ -5,17 +5,11 @@ import (
 	"io/ioutil"
 )
 
-type PluginConfig struct {
-	PluginName string          `yaml:"name" json:"name"`
-	Enabled    bool            `yaml:"enabled" json:"enabled"`
-	Config     json.RawMessage `yaml:"config" json:"config"`
-}
-
 type config struct {
 	Discord struct {
 		Token string `yaml:"token" json:"token"`
 	} `yaml:"discord" json:"discord"`
-	Plugins []PluginConfig `yaml:"plugins" json:"plugins"`
+	DatabaseConfig string `json:"db_string"`
 }
 
 func loadconfig(path string) (*config, error) {

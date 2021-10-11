@@ -2,9 +2,10 @@ package haleakala
 
 import (
 	"fmt"
-	"sync"
 
+	"github.com/tankbusta/haleakala/database"
 	"github.com/tankbusta/haleakala/plugin"
+	"github.com/uptrace/bun"
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/rs/zerolog/log"
@@ -20,17 +21,19 @@ var (
 // Context TODO
 type Context struct {
 	// unexported fields below
-	cfg  *config
-	ds   *discordgo.Session
-	stop chan bool
-	wg   *sync.WaitGroup
-
-	// Plugin Stuff
+	cfg     *config
+	ds      *discordgo.Session
+	db      *bun.DB
 	plugins map[string]plugin.IBasicPlugin
 }
 
 func New(configPath string) (*Context, error) {
 	cfg, err := loadconfig(configPath)
+	if err != nil {
+		return nil, err
+	}
+
+	db, err := database.GetDatabase(cfg.DatabaseConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -43,8 +46,7 @@ func New(configPath string) (*Context, error) {
 	return &Context{
 		cfg:     cfg,
 		ds:      ds,
-		stop:    make(chan bool, 1),
-		wg:      &sync.WaitGroup{},
+		db:      db,
 		plugins: make(map[string]plugin.IBasicPlugin),
 	}, nil
 }
@@ -52,11 +54,16 @@ func New(configPath string) (*Context, error) {
 // Start connects to discord and starts listening for messages
 func (s *Context) Start() error {
 	slashCommands := make(map[string]plugin.IBasicPlugin)
+	ready := make(chan struct{}, 1)
 
 	s.ds.AddHandler(func(s *discordgo.Session, r *discordgo.Ready) {
 		log.Info().
 			Int("version", r.Version).
 			Msg("Bot is ready!")
+
+		// Notify that we're ready to start initializing commands and complete the bot's
+		// initialization. Without this, we can panic while creating slash commands.
+		ready <- struct{}{}
 	})
 
 	s.ds.AddHandler(func(s *discordgo.Session, i *discordgo.InteractionCreate) {
@@ -68,6 +75,11 @@ func (s *Context) Start() error {
 	if err := s.ds.Open(); err != nil {
 		return err
 	}
+
+	// TODO: A timeout of sorts
+	<-ready
+	// ready channel is no longer needed
+	close(ready)
 
 	for _, plugName := range plugin.GetListOfPlugins() {
 		plug := plugin.GetPlugin(plugName)
@@ -87,6 +99,12 @@ func (s *Context) Start() error {
 			slashCommands[cmd.Name] = plug
 		}
 
+		if err := plug.OnLoad(s.ds, s.db); err != nil {
+			log.Error().
+				Err(err).
+				Msgf("Failed to initialize plugin `%s`", plugName)
+		}
+
 		s.plugins[plugName] = plug
 	}
 
@@ -95,13 +113,14 @@ func (s *Context) Start() error {
 
 // Stop will end the bot safely
 func (s *Context) Stop() error {
-	close(s.stop)
-	// Wait for all our main goroutines to exit..
-	s.wg.Wait()
-
 	for _, p := range s.plugins {
-		if advp, ok := p.(plugin.IPlugin); ok {
-			advp.Destroy()
+		log.Warn().
+			Msgf("Unloading plugin `%s`", p.Name())
+
+		if err := p.OnShutdown(s.ds); err != nil {
+			log.Error().
+				Err(err).
+				Msgf("Failed to shutting down plugin `%s`", p.Name())
 		}
 	}
 
